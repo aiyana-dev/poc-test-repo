@@ -39,6 +39,9 @@ jobs:
           # Show the current entry (if any)
           jq '.packages // .dependencies' package-lock.json | sed -n '1,200p' || true
 
+      - name: DEBUG - Show lockfile content before patching
+        run: cat package-lock.json
+
       - name: Patch package-lock.json to point resolved to Verdaccio tarball
         run: |
           # The exact Verdaccio tarball URL you confirmed previously:
