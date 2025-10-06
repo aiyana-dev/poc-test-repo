@@ -17,7 +17,7 @@ jobs:
 
       - name: Attempt to install packages
         # npm ci is strict and uses the lockfile. This SHOULD fail.
-        run: npm ci
+        run: npm install
 
       - name: Execute the package script (will not be reached if npm ci fails)
         run: node ./node_modules/@aiyana-dev/legit-package/index.js
